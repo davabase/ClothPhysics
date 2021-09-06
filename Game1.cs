@@ -36,6 +36,8 @@ namespace ClothPhysics
         Point dragPoint = new Point();
         Stick dragStick = new Stick();
 
+        float lastWindChange = 0;
+
         Texture2D CreateCircle(int radius, Color color)
         {
             int diameter = radius * 2;
@@ -204,6 +206,19 @@ namespace ClothPhysics
             bool controlDown = keyState.IsKeyDown(Keys.LeftControl) || keyState.IsKeyDown(Keys.RightControl);
             bool fPressed = keyState.IsKeyDown(Keys.F) && !fPressedPrevious;
             fPressedPrevious = keyState.IsKeyDown(Keys.F);
+
+            bool doWind = false;
+            if (doWind)
+            {
+                if (gameTime.TotalGameTime.TotalSeconds - lastWindChange > 5f)
+                {
+                    Random rand = new Random();
+                    float wind = (float)rand.NextDouble() * 0.0025f;
+                    wind *= rand.Next(2) == 1 ? -1 : 1;
+                    gravity.X = wind;
+                    lastWindChange = (float)gameTime.TotalGameTime.TotalSeconds;
+                }
+            }
 
             if (!simulate)
             {
