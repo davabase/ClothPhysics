@@ -177,7 +177,7 @@ namespace ClothPhysics
             lineTexture.SetData<Color>(colors);
 
             Vector2 position = new Vector2(1280f / 2f - 720f / 2f, 25f);
-            GenerateGrid(position, 720, 720 - 50, 30, 30);
+            GenerateGrid(position, 720, 720 - 50, 25, 25);
 
             base.Initialize();
         }
