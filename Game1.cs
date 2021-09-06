@@ -83,6 +83,7 @@ namespace ClothPhysics
                 {
                     Vector2 positionBeforeUpdate = point.position;
                     Vector2 velocity = point.position - point.previousPosition;
+
                     // Set a max speed, otherwise the cloth bounces too much.
                     if (velocity.Length() > 10f)
                     {
@@ -95,6 +96,8 @@ namespace ClothPhysics
                 }
             }
 
+            // Solve simulation for stick length.
+            // The less iterations, the more stretchy the cloth behaves because we are not trying to hard to set constraints.
             for (int i = 0; i < numIterations; i++)
             {
                 foreach(Stick stick in sticks)
@@ -115,9 +118,11 @@ namespace ClothPhysics
 
         void GenerateGrid(Vector2 position, float width, float height, int columns, int rows)
         {
+            // Calculate the separation distance between each point.
             float xDistance = width / columns;
             float yDistance = height / rows;
 
+            // Loop through all points.
             for (int x = 0; x < columns; x++)
             {
                 Point pointPrevious = null;
@@ -129,6 +134,7 @@ namespace ClothPhysics
                     point.position += position;
                     points.Add(point);
 
+                    // Connect the columns together with sticks.
                     if (pointPrevious != null)
                     {
                         Stick stick = new Stick();
@@ -141,6 +147,7 @@ namespace ClothPhysics
                 }
             }
 
+            // Connect the rows together with sticks.
             for (int i = 0; i < rows; i++)
             {
                 for(int j = columns + i; j < points.Count; j += columns)
@@ -165,17 +172,20 @@ namespace ClothPhysics
 
         protected override void Initialize()
         {
+            // Update the size of the window and toggle full screen.
             _graphics.PreferredBackBufferWidth = 1280;
             _graphics.PreferredBackBufferHeight = 720;
             _graphics.ToggleFullScreen();
             _graphics.ApplyChanges();
 
+            // Create the circle texture and line texture.
             pointTexture = CreateCircle(pointRadius, Color.White);
             lineTexture = new Texture2D(_graphics.GraphicsDevice, 1, 1);
             Color[] colors = new Color[1];
             Array.Fill<Color>(colors, Color.White);
             lineTexture.SetData<Color>(colors);
 
+            // Generate a grid of points and sticks in the center of the screen.
             Vector2 position = new Vector2(1280f / 2f - 720f / 2f, 25f);
             GenerateGrid(position, 720, 720 - 50, 25, 25);
 
@@ -192,6 +202,8 @@ namespace ClothPhysics
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
+            // Capture mouse state and keyboard state.
+            // Since we can only check if a button or key is down, save the previous state of the button to find the rising edge.
             MouseState mouseState = Mouse.GetState();
             KeyboardState keyState = Keyboard.GetState();
             Vector2 mousePos = mouseState.Position.ToVector2();
@@ -207,6 +219,7 @@ namespace ClothPhysics
             bool fPressed = keyState.IsKeyDown(Keys.F) && !fPressedPrevious;
             fPressedPrevious = keyState.IsKeyDown(Keys.F);
 
+            // Simple random wind.
             bool doWind = false;
             if (doWind)
             {
@@ -220,17 +233,20 @@ namespace ClothPhysics
                 }
             }
 
+            // Allow modification of the cloth when the simulation is not running.
             if (!simulate)
             {
                 if (leftClick)
                 {
                     if (!controlDown)
                     {
+                        // Check if we clicked on a point.
                         bool selected = false;
                         foreach(Point point in points)
                         {
                             if (Vector2.Distance(mousePos, point.position) <= pointRadius)
                             {
+                                // If we did, set selectedPoint to it and setup dragStick to use it.
                                 selectedPoint = point;
                                 selected = true;
                                 dragStick.pointA = point;
@@ -242,6 +258,7 @@ namespace ClothPhysics
 
                         if (!selected)
                         {
+                            // If we didn't click on a point, create a new one instead.
                             Point point = new Point();
                             point.position = mousePos;
                             points.Add(point);
@@ -249,49 +266,65 @@ namespace ClothPhysics
                     }
                     else
                     {
+                        // Delete points if we are holding the control key while clicking.
                         for (int i = 0; i < points.Count; i++)
                         {
                             Point point = points[i];
                             if (Vector2.Distance(mousePos, point.position) <= pointRadius)
                             {
                                 points.Remove(point);
+
+                                // Loop through all sticks and delete the ones that used this point.
                                 for (int j = 0; j < sticks.Count; j++)
                                 {
                                     Stick stick = sticks[j];
                                     if (stick.pointA == point || stick.pointB == point)
                                     {
                                         sticks.Remove(stick);
+
+                                        // Since we modified the list in-place by removing the item at j, 
+                                        // go back one to catch the next item.
                                         j--;
                                     }
                                 }
+                                // Only handle one point at a time so we don't accidentally delete two.
                                 break;
                             }
                         }
                     }
                 }
 
+                // Check if we are currently dragging from one point to another.
                 if (selectedPoint != null)
                 {
+                    // Move dragPoint to the mouse position so we can draw a stick from selectedPoint to the mouse.
                     dragPoint.position = mousePos;
+
+                    // Check ff we released the mouse button on a point.
                     if (leftReleased)
                     {
                         foreach(Point point in points)
                         {
                             if (Vector2.Distance(mousePos, point.position) <= pointRadius)
                             {
+                                // We've successfully dragged a stick from one point to another, create a stick.
                                 Stick stick = new Stick();
                                 stick.pointA = selectedPoint;
                                 stick.pointB = point;
                                 stick.length = Vector2.Distance(selectedPoint.position, point.position);
                                 sticks.Add(stick);
-                                selectedPoint = null;
+
+                                // Remove dragStick from sticks so it is no longer drawn.
+                                // Set selectedPoint to null to reset the dragging state.
                                 sticks.Remove(dragStick);
+                                selectedPoint = null;
                                 break;
                             }
                         }
                     }
                 }
 
+                // Lock points if we right click on them.
                 if (rightClick)
                 {
                     foreach(Point point in points)
@@ -304,6 +337,7 @@ namespace ClothPhysics
                 }
             }
 
+            // Toggle the simulation if the spacebar is pressed.
             if (spacePressed)
             {
                 simulate = !simulate;
@@ -317,13 +351,19 @@ namespace ClothPhysics
                 {
                     foreach(Stick stick in sticks)
                     {
+                        // The distance the mouse is from the stick.
+                        // https://stackoverflow.com/a/17693146/13900323
                         float distance = MathF.Abs(Vector2.Distance(stick.pointA.position, stick.pointB.position) -
                                                    (Vector2.Distance(mousePos, stick.pointA.position) +
                                                     Vector2.Distance(mousePos, stick.pointB.position)));
-                        // Distance the mouse has to be from the line.
+
+                        // Distance the mouse has to be from the line. 2 is the "radius" of the mouse.
                         if (distance < 2f)
                         {
                             sticks.Remove(stick);
+
+                            // Once we remove the stick, check if the points are connected to any other sticks.
+                            // Remove them if they are not.
                             Point pointA = stick.pointA;
                             Point pointB = stick.pointB;
                             bool aInStick = false;
@@ -353,6 +393,8 @@ namespace ClothPhysics
                 }
             }
 
+            // Toggle fullscreen if F is pressed.
+            // Also, pay respects.
             if (fPressed)
             {
                 _graphics.ToggleFullScreen();
@@ -373,6 +415,7 @@ namespace ClothPhysics
 
             foreach(Point point in points)
             {
+                // Draw locked points as red.
                 Color color = point.locked ? Color.Red : Color.White;
                 _spriteBatch.Draw(pointTexture, point.position - new Vector2(pointRadius), color);
             }
